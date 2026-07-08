@@ -10,33 +10,39 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<div class="wrap">
+<div class="app-shell">
 
-  <header class="masthead">
-    <div>
-      <p class="eyebrow">Consultoria CoMarques &middot; Administrativo &amp; RH</p>
-      <h1>Painel Estratégico</h1>
-      <p class="sub">Visão consolidada de faturamento, despesas e funil de recrutamento.</p>
+  <aside class="sidebar">
+    <div class="brand">
+      <p class="eyebrow">Consultoria</p>
+      <strong>CoMarques</strong>
     </div>
-    <div class="stamp">
-      <div class="stamp-inner">
-        Atualizado em<br>
-        <strong id="stamp-data">—</strong>
+    <nav id="nav-abas"></nav>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <h1 id="titulo-aba">Visão geral</h1>
+      <div class="filtro-grupo">
+        <span>Período</span>
+        <input type="month" id="filtro-de">
+        <span>até</span>
+        <input type="month" id="filtro-ate">
       </div>
-    </div>
-  </header>
-
-  <div id="conteudo">
-    <div class="estado" id="carregando">
-      <h2>Carregando dados…</h2>
-      <p>Buscando informações direto da planilha via Apps Script.</p>
-    </div>
+      <div class="filtro-grupo">
+        <span>Cliente</span>
+        <select id="filtro-cliente"><option value="todos">Todos os clientes</option></select>
+      </div>
+    </header>
+    <main class="content-area" id="conteudo">
+      <div class="estado"><h2>Carregando dados…</h2></div>
+    </main>
   </div>
 
 </div>
 
 <script src="js/config.js"></script>
 <script src="js/gas.js"></script>
-<script src="js/interno.js"></script>
+<script src="js/painel.js"></script>
 </body>
 </html>
