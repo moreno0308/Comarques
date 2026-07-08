@@ -11,7 +11,8 @@
     { id: 'clientes', label: 'Clientes' },
     { id: 'vagas', label: 'Vagas' },
     { id: 'metas', label: 'Metas' },
-    { id: 'solicitacoes', label: 'Solicitações' }
+    { id: 'solicitacoes', label: 'Solicitações' },
+    { id: 'lancar', label: 'Lançar dados' }
   ];
 
   var estado = { dados: null, abaAtual: 'visao', deMonth: null, ateMonth: null, clienteId: 'todos' };
@@ -181,7 +182,7 @@
   function renderAba() {
     destruirGraficos();
     var f = getFiltrado();
-    var fn = { visao: renderVisao, financeiro: renderFinanceiro, operacional: renderOperacional, comercial: renderComercial, clientes: renderClientes, vagas: renderVagas, metas: renderMetas, solicitacoes: renderSolicitacoes }[estado.abaAtual];
+    var fn = { visao: renderVisao, financeiro: renderFinanceiro, operacional: renderOperacional, comercial: renderComercial, clientes: renderClientes, vagas: renderVagas, metas: renderMetas, solicitacoes: renderSolicitacoes, lancar: renderLancar }[estado.abaAtual];
     document.getElementById('conteudo').innerHTML = fn.html(f);
     if (fn.chart) fn.chart(f);
   }
@@ -365,6 +366,85 @@
       '</div>';
   }
   renderSolicitacoes.html = renderSolicitacoes;
+
+  // ---- Lançar dados (admin) ----
+  function tipoCampo(header) {
+    var h = header.toLowerCase();
+    if (/cliente|empresa/.test(h) && /id|cliente$/.test(h)) return 'cliente';
+    if (/data|início|inicio|fechamento|admiss|demiss|nascimento|abertura|t[eé]rmino/.test(h)) return 'date';
+    if (/valor|sal[aá]rio|qtda|parcela|remunera|candidatados|entrevistados|sla|filhos|^ano$/.test(h)) return 'number';
+    return 'text';
+  }
+
+  function renderLancar() {
+    return '<div class="section-title"><h2>Lançar dados</h2><span class="desc">Escreve direto nas abas oficiais da planilha</span></div>' +
+      '<div class="card" style="max-width:560px;" id="lancar-form-area"><p style="color:var(--muted);">Carregando estrutura das abas…</p></div>';
+  }
+  renderLancar.html = renderLancar;
+  renderLancar.chart = function () {
+    if (estado.estrutura) { montarFormLancar(); return; }
+    chamarAppsScript({ action: 'estrutura', chave: pegarChaveSalva() }).then(function (res) {
+      if (res.erro) { document.getElementById('lancar-form-area').innerHTML = '<p class="mensagem erro">' + res.erro + '</p>'; return; }
+      estado.estrutura = res.abas;
+      montarFormLancar();
+    }).catch(function (err) {
+      document.getElementById('lancar-form-area').innerHTML = '<p class="mensagem erro">' + err.message + '</p>';
+    });
+  };
+
+  function montarFormLancar() {
+    var abas = Object.keys(estado.estrutura);
+    var area = document.getElementById('lancar-form-area');
+    area.innerHTML =
+      '<select id="sel-aba-lancar">' + abas.map(function (a) { return '<option value="' + a + '">' + a + '</option>'; }).join('') + '</select>' +
+      '<div id="campos-lancar" style="margin-top:14px;display:flex;flex-direction:column;gap:10px;"></div>' +
+      '<button id="btn-lancar" style="width:100%;margin-top:14px;">Adicionar lançamento</button>' +
+      '<p class="mensagem" id="msg-lancar"></p>';
+
+    var sel = document.getElementById('sel-aba-lancar');
+    function montarCampos() {
+      var headers = estado.estrutura[sel.value];
+      document.getElementById('campos-lancar').innerHTML = headers.map(function (h) {
+        var tipo = tipoCampo(h);
+        if (tipo === 'cliente') {
+          return '<label style="font-size:12px;color:var(--muted);">' + h +
+            '<select data-campo="' + h + '" style="margin-top:4px;">' +
+            estado.dados.clientes.map(function (c) { return '<option value="' + c.id + '">' + c.nome + '</option>'; }).join('') +
+            '</select></label>';
+        }
+        var inputTipo = tipo === 'date' ? 'date' : (tipo === 'number' ? 'number' : 'text');
+        return '<label style="font-size:12px;color:var(--muted);">' + h +
+          '<input type="' + inputTipo + '" data-campo="' + h + '" style="margin-top:4px;"></label>';
+      }).join('');
+    }
+    sel.addEventListener('change', montarCampos);
+    montarCampos();
+
+    document.getElementById('btn-lancar').addEventListener('click', function () {
+      var nomeAba = sel.value;
+      var campos = {};
+      document.querySelectorAll('#campos-lancar [data-campo]').forEach(function (el) {
+        var h = el.getAttribute('data-campo');
+        var tipo = tipoCampo(h);
+        campos[h] = tipo === 'number' ? parseFloat(el.value || '0') : el.value;
+      });
+      var msg = document.getElementById('msg-lancar');
+      var btn = document.getElementById('btn-lancar');
+      btn.disabled = true; btn.textContent = 'Salvando…';
+
+      enviarAppsScript({ action: 'adminLancar', chave: pegarChaveSalva(), aba: nomeAba, campos: campos })
+        .then(function (res) {
+          btn.disabled = false; btn.textContent = 'Adicionar lançamento';
+          if (res.erro) { msg.textContent = res.erro; msg.className = 'mensagem erro'; return; }
+          msg.textContent = res.mensagem + ' Recarregue a aba pra ver refletido nos números.'; msg.className = 'mensagem sucesso';
+          montarCampos();
+        })
+        .catch(function (err) {
+          btn.disabled = false; btn.textContent = 'Adicionar lançamento';
+          msg.textContent = err.message; msg.className = 'mensagem erro';
+        });
+    });
+  }
 
   iniciar();
 })();
