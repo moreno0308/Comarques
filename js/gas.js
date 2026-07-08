@@ -53,3 +53,20 @@ function formatarDataHora(iso) {
     return '—';
   }
 }
+
+/**
+ * Envia dados para o Apps Script (rota de escrita, via doPost).
+ * Usa Content-Type text/plain de propósito: isso evita o preflight
+ * de CORS (que o Apps Script não responde bem), e o doPost() do
+ * backend já sabe fazer JSON.parse do corpo mesmo assim.
+ */
+function enviarAppsScript(payload) {
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf('COLE_AQUI') !== -1) {
+    return Promise.reject(new Error('Configure a URL do Apps Script em js/config.js'));
+  }
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  }).then(function (res) { return res.json(); });
+}

@@ -7,7 +7,7 @@
     { id: 'vagas', label: 'Vagas' },
     { id: 'equipe', label: 'Equipe' }
   ];
-  var estado = { dados: null, aba: 'resumo', deMonth: null, ateMonth: null };
+  var estado = { dados: null, aba: 'resumo', deMonth: null, ateMonth: null, email: '', senha: '' };
   var chartsAtivos = [];
 
   document.getElementById('btn-solicitar').addEventListener('click', entrar);
@@ -30,6 +30,8 @@
         btn.disabled = false; btn.textContent = 'Entrar';
         if (res.erro) { msg.textContent = res.erro; msg.className = 'mensagem erro'; return; }
         estado.dados = res;
+        estado.email = email;
+        estado.senha = senha;
         montarApp();
       })
       .catch(function (err) {
@@ -168,6 +170,76 @@
       tabela(['Nome', 'Cargo', 'Salário atual', 'Situação'], f.colaboradores.map(function (c) {
         return [c.nome, c.cargo, formatarMoeda(c.salarioAtual), c.demissao ? badge('Desligado') : badge('Ativo')];
       })) + '</div>';
+  }
+
+  var CAMPOS_POR_CATEGORIA = {
+    'Nova vaga': [
+      { id: 'cargo', label: 'Cargo', tipo: 'text' },
+      { id: 'tipoVaga', label: 'Tipo de vaga (Operacional/Gestão/etc.)', tipo: 'text' },
+      { id: 'quantidade', label: 'Quantidade de vagas', tipo: 'number' },
+      { id: 'remuneracao', label: 'Remuneração prevista', tipo: 'text' },
+      { id: 'observacoes', label: 'Observações', tipo: 'textarea' }
+    ],
+    'Atualização de colaborador': [
+      { id: 'tipoAtualizacao', label: 'Tipo (Admissão/Demissão/Alteração salarial)', tipo: 'text' },
+      { id: 'nome', label: 'Nome do colaborador', tipo: 'text' },
+      { id: 'cargo', label: 'Cargo', tipo: 'text' },
+      { id: 'data', label: 'Data', tipo: 'date' },
+      { id: 'salario', label: 'Salário (se aplicável)', tipo: 'text' },
+      { id: 'observacoes', label: 'Observações', tipo: 'textarea' }
+    ],
+    'Outro': [
+      { id: 'assunto', label: 'Assunto', tipo: 'text' },
+      { id: 'descricao', label: 'Descrição', tipo: 'textarea' }
+    ]
+  };
+
+  function renderEnviar() {
+    var categorias = Object.keys(CAMPOS_POR_CATEGORIA);
+    document.getElementById('conteudo').innerHTML =
+      '<div class="card" style="max-width:520px;">' +
+      '<h3>Enviar dados pro seu consultor</h3>' +
+      '<p style="color:var(--muted);font-size:13px;margin-top:-8px;">Preenche aqui em vez de mandar por WhatsApp/e-mail — cai direto na fila de revisão.</p>' +
+      '<div style="margin-top:16px;">' +
+      '<select id="sel-categoria">' + categorias.map(function (c) { return '<option value="' + c + '">' + c + '</option>'; }).join('') + '</select>' +
+      '<div id="campos-dinamicos" style="margin-top:12px;display:flex;flex-direction:column;gap:10px;"></div>' +
+      '<button id="btn-enviar-solicitacao" style="width:100%;margin-top:14px;">Enviar</button>' +
+      '<p class="mensagem" id="msg-enviar"></p>' +
+      '</div></div>';
+
+    var sel = document.getElementById('sel-categoria');
+    function montarCampos() {
+      var campos = CAMPOS_POR_CATEGORIA[sel.value];
+      document.getElementById('campos-dinamicos').innerHTML = campos.map(function (c) {
+        if (c.tipo === 'textarea') return '<textarea id="campo-' + c.id + '" placeholder="' + c.label + '" rows="3" style="font-family:var(--font-body);font-size:14px;padding:10px;border:1px solid var(--line);border-radius:6px;width:100%;"></textarea>';
+        return '<input type="' + c.tipo + '" id="campo-' + c.id + '" placeholder="' + c.label + '">';
+      }).join('');
+    }
+    sel.addEventListener('change', montarCampos);
+    montarCampos();
+
+    document.getElementById('btn-enviar-solicitacao').addEventListener('click', function () {
+      var categoria = sel.value;
+      var campos = {};
+      CAMPOS_POR_CATEGORIA[categoria].forEach(function (c) {
+        campos[c.label] = document.getElementById('campo-' + c.id).value.trim();
+      });
+      var msg = document.getElementById('msg-enviar');
+      var btn = document.getElementById('btn-enviar-solicitacao');
+      btn.disabled = true; btn.textContent = 'Enviando…';
+
+      enviarAppsScript({ action: 'enviarSolicitacao', email: estado.email, senha: estado.senha, categoria: categoria, campos: campos })
+        .then(function (res) {
+          btn.disabled = false; btn.textContent = 'Enviar';
+          if (res.erro) { msg.textContent = res.erro; msg.className = 'mensagem erro'; return; }
+          msg.textContent = res.mensagem; msg.className = 'mensagem sucesso';
+          montarCampos();
+        })
+        .catch(function (err) {
+          btn.disabled = false; btn.textContent = 'Enviar';
+          msg.textContent = err.message; msg.className = 'mensagem erro';
+        });
+    });
   }
 
   function tabela(cabecalhos, linhas) {

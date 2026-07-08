@@ -10,7 +10,8 @@
     { id: 'comercial', label: 'Comercial' },
     { id: 'clientes', label: 'Clientes' },
     { id: 'vagas', label: 'Vagas' },
-    { id: 'metas', label: 'Metas' }
+    { id: 'metas', label: 'Metas' },
+    { id: 'solicitacoes', label: 'Solicitações' }
   ];
 
   var estado = { dados: null, abaAtual: 'visao', deMonth: null, ateMonth: null, clienteId: 'todos' };
@@ -180,7 +181,7 @@
   function renderAba() {
     destruirGraficos();
     var f = getFiltrado();
-    var fn = { visao: renderVisao, financeiro: renderFinanceiro, operacional: renderOperacional, comercial: renderComercial, clientes: renderClientes, vagas: renderVagas, metas: renderMetas }[estado.abaAtual];
+    var fn = { visao: renderVisao, financeiro: renderFinanceiro, operacional: renderOperacional, comercial: renderComercial, clientes: renderClientes, vagas: renderVagas, metas: renderMetas, solicitacoes: renderSolicitacoes }[estado.abaAtual];
     document.getElementById('conteudo').innerHTML = fn.html(f);
     if (fn.chart) fn.chart(f);
   }
@@ -351,6 +352,19 @@
       { type: 'line', label: 'Realizado', data: meses.map(function (m) { return realizadoMap[m] || 0; }), borderColor: CORES.warm, tension: 0.3 }
     ] }, options: { plugins: { legend: { position: 'bottom' } } } });
   };
+
+  // ---- Solicitações ----
+  function renderSolicitacoes() {
+    var lista = estado.dados.solicitacoes || [];
+    return secTitle('Solicitações dos clientes', lista.length + ' registro(s) — não segue o filtro de período/cliente') +
+      '<div class="card">' +
+      tabela(['Data', 'Empresa', 'Categoria', 'Resumo', 'Status'], lista.map(function (s) {
+        return [s.timestamp ? formatarDataHora(s.timestamp) : '—', s.empresa, s.categoria, s.resumo, badge(s.status)];
+      })) +
+      '<p style="color:var(--muted);font-size:12px;margin-top:14px;">Pra marcar como atendida, edite a coluna "Status" direto na aba Solicitações da planilha.</p>' +
+      '</div>';
+  }
+  renderSolicitacoes.html = renderSolicitacoes;
 
   iniciar();
 })();
