@@ -1,67 +1,27 @@
 (function () {
-  var emailAtual = '';
-
-  document.getElementById('btn-solicitar').addEventListener('click', solicitarCodigo);
-  document.getElementById('input-email').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') solicitarCodigo();
+  document.getElementById('btn-solicitar').addEventListener('click', entrar);
+  document.getElementById('input-senha').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') entrar();
   });
 
-  function solicitarCodigo() {
+  function entrar() {
     var email = document.getElementById('input-email').value.trim();
+    var senha = document.getElementById('input-senha').value.trim();
     var msg = document.getElementById('msg-login');
-    if (!email) { msg.textContent = 'Informe um e-mail.'; msg.className = 'mensagem erro'; return; }
+    if (!email || !senha) { msg.textContent = 'Informe e-mail e senha.'; msg.className = 'mensagem erro'; return; }
 
     var btn = document.getElementById('btn-solicitar');
-    btn.disabled = true; btn.textContent = 'Enviando…';
+    btn.disabled = true; btn.textContent = 'Entrando…';
     msg.textContent = ''; msg.className = 'mensagem';
 
-    chamarAppsScript({ action: 'solicitarCodigo', email: email })
+    chamarAppsScript({ action: 'cliente', email: email, senha: senha })
       .then(function (res) {
-        btn.disabled = false; btn.textContent = 'Enviar código de acesso';
+        btn.disabled = false; btn.textContent = 'Entrar';
         if (res.erro) { msg.textContent = res.erro; msg.className = 'mensagem erro'; return; }
-        emailAtual = email;
-        renderFormCodigo(res.mensagem);
-      })
-      .catch(function (err) {
-        btn.disabled = false; btn.textContent = 'Enviar código de acesso';
-        msg.textContent = err.message; msg.className = 'mensagem erro';
-      });
-  }
-
-  function renderFormCodigo(mensagem) {
-    document.getElementById('conteudo').innerHTML =
-      '<div class="estado" style="max-width:360px;margin:0 auto;text-align:left;">' +
-      '<h2 style="text-align:center;">Digite o código</h2>' +
-      '<p style="text-align:center;">' + mensagem + '</p>' +
-      '<div style="margin-top:20px;">' +
-      '<input type="text" id="input-codigo" placeholder="Código de 6 dígitos" maxlength="6">' +
-      '<button id="btn-confirmar" style="width:100%;margin-top:10px;">Confirmar</button>' +
-      '<p class="mensagem" id="msg-codigo"></p>' +
-      '</div></div>';
-    document.getElementById('btn-confirmar').addEventListener('click', confirmarCodigo);
-    document.getElementById('input-codigo').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') confirmarCodigo();
-    });
-    document.getElementById('input-codigo').focus();
-  }
-
-  function confirmarCodigo() {
-    var codigo = document.getElementById('input-codigo').value.trim();
-    var msg = document.getElementById('msg-codigo');
-    var btn = document.getElementById('btn-confirmar');
-    btn.disabled = true; btn.textContent = 'Verificando…';
-
-    chamarAppsScript({ action: 'cliente', email: emailAtual, codigo: codigo })
-      .then(function (res) {
-        if (res.erro) {
-          btn.disabled = false; btn.textContent = 'Confirmar';
-          msg.textContent = res.erro; msg.className = 'mensagem erro';
-          return;
-        }
         renderPortal(res);
       })
       .catch(function (err) {
-        btn.disabled = false; btn.textContent = 'Confirmar';
+        btn.disabled = false; btn.textContent = 'Entrar';
         msg.textContent = err.message; msg.className = 'mensagem erro';
       });
   }
