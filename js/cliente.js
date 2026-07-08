@@ -1,4 +1,15 @@
 (function () {
+  var CORES = { accent: '#6C4FD1', warm: '#8B7FE8', danger: '#C74B86' };
+  var PALETA_DONUT = ['#6C4FD1', '#8B7FE8', '#C74B86', '#B9A8ED'];
+  var ABAS = [
+    { id: 'resumo', label: 'Resumo' },
+    { id: 'contratos', label: 'Contratos' },
+    { id: 'vagas', label: 'Vagas' },
+    { id: 'equipe', label: 'Equipe' }
+  ];
+  var estado = { dados: null, aba: 'resumo' };
+  var chartsAtivos = [];
+
   document.getElementById('btn-solicitar').addEventListener('click', entrar);
   document.getElementById('input-senha').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') entrar();
@@ -18,7 +29,8 @@
       .then(function (res) {
         btn.disabled = false; btn.textContent = 'Entrar';
         if (res.erro) { msg.textContent = res.erro; msg.className = 'mensagem erro'; return; }
-        renderPortal(res);
+        estado.dados = res;
+        montarApp();
       })
       .catch(function (err) {
         btn.disabled = false; btn.textContent = 'Entrar';
@@ -26,65 +38,89 @@
       });
   }
 
-  function renderPortal(d) {
-    document.querySelector('.wrap').style.maxWidth = '980px';
-    var f = d.funil;
+  function montarApp() {
+    document.body.innerHTML =
+      '<div class="app-shell">' +
+      '<aside class="sidebar">' +
+      '<div class="brand"><p class="eyebrow">Portal do cliente</p><strong>' + estado.dados.empresa + '</strong></div>' +
+      '<nav id="nav-abas"></nav>' +
+      '</aside>' +
+      '<div class="main-area">' +
+      '<header class="topbar"><h1 id="titulo-aba">Resumo</h1></header>' +
+      '<main class="content-area" id="conteudo"></main>' +
+      '</div></div>';
 
-    var html = '<section><div class="section-title"><h2>' + d.empresa + '</h2>' +
-      '<span class="desc">' + (d.segmento || '') + '</span></div>' +
+    var nav = document.getElementById('nav-abas');
+    nav.innerHTML = ABAS.map(function (a, i) {
+      return '<button data-aba="' + a.id + '" class="' + (a.id === estado.aba ? 'ativo' : '') + '">' +
+        '<span class="n">' + String(i + 1).padStart(2, '0') + '</span><span>' + a.label + '</span></button>';
+    }).join('');
+    nav.querySelectorAll('button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        estado.aba = btn.getAttribute('data-aba');
+        nav.querySelectorAll('button').forEach(function (b) { b.classList.remove('ativo'); });
+        btn.classList.add('ativo');
+        document.getElementById('titulo-aba').textContent = ABAS.find(function (a) { return a.id === estado.aba; }).label;
+        renderAba();
+      });
+    });
+    renderAba();
+  }
+
+  function destruirGraficos() { chartsAtivos.forEach(function (c) { c.destroy(); }); chartsAtivos = []; }
+  function criarChart(el, config) { var c = new Chart(el, config); chartsAtivos.push(c); return c; }
+
+  function renderAba() {
+    destruirGraficos();
+    var fn = { resumo: renderResumo, contratos: renderContratos, vagas: renderVagas, equipe: renderEquipe }[estado.aba];
+    fn();
+  }
+
+  function renderResumo() {
+    var d = estado.dados, f = d.funil;
+    document.getElementById('conteudo').innerHTML =
       '<div class="kpi-row">' +
       '<div class="kpi positivo"><div class="label">Total investido com a CoMarques</div><div class="value">' + formatarMoeda(d.totalPago) + '</div></div>' +
       '<div class="kpi"><div class="label">Colaboradores ativos</div><div class="value">' + formatarNumero(d.totalColaboradoresAtivos) + '</div></div>' +
       '<div class="kpi"><div class="label">Vagas com contratação</div><div class="value">' + formatarNumero(f.contratados) + '</div></div>' +
-      '</div></section>';
-
-    html += '<section><div class="section-title"><h2>Funil de recrutamento das suas vagas</h2></div>' +
-      '<div class="funil">' +
+      '</div>' +
+      '<div class="funil" style="margin-top:24px;">' +
       '<div class="funil-etapa"><div class="label">Candidatados</div><div class="value">' + formatarNumero(f.candidatados) + '</div></div>' +
       '<div class="funil-etapa"><div class="label">Entrevistados</div><div class="value">' + formatarNumero(f.entrevistados) + '</div></div>' +
       '<div class="funil-etapa"><div class="label">Contratados</div><div class="value">' + formatarNumero(f.contratados) + '</div></div>' +
-      '</div></section>';
+      '</div>' +
+      '<div class="card" style="margin-top:24px;"><h3>Evolução do investimento</h3><canvas id="chart-cliente" height="140"></canvas></div>';
 
-    html += '<section><div class="section-title"><h2>Evolução do investimento</h2></div>' +
-      '<div class="card"><canvas id="chart-cliente" height="140"></canvas></div></section>';
-
-    html += '<section><div class="section-title"><h2>Contratos / orçamentos</h2></div><div class="card">' +
-      tabela(['Categoria', 'Tipo', 'Valor', 'Status'],
-        d.orcamentos.map(function (o) { return [o.categoria, o.tipo, formatarMoeda(o.valor), badge(o.status)]; })) +
-      '</div></section>';
-
-    if (d.vagas.length) {
-      html += '<section><div class="section-title"><h2>Vagas</h2></div><div class="card">' +
-        tabela(['Cargo', 'Status'],
-          d.vagas.map(function (v) { return [v.cargo, badge(v.status)]; })) +
-        '</div></section>';
-    }
-
-    if (d.colaboradores.length) {
-      html += '<section><div class="section-title"><h2>Seus colaboradores</h2></div><div class="card">' +
-        tabela(['Nome', 'Cargo', 'Salário atual', 'Situação'],
-          d.colaboradores.map(function (c) {
-            return [c.nome, c.cargo, formatarMoeda(c.salarioAtual), c.demissao ? badge('Desligado') : badge('Ativo')];
-          })) +
-        '</div></section>';
-    }
-
-    document.getElementById('conteudo').innerHTML = html;
-
-    new Chart(document.getElementById('chart-cliente'), {
+    criarChart(document.getElementById('chart-cliente'), {
       type: 'line',
       data: {
         labels: d.evolucaoMensal.map(function (m) { return m.rotulo; }),
-        datasets: [{
-          label: 'Valor pago',
-          data: d.evolucaoMensal.map(function (m) { return m.valor; }),
-          borderColor: '#6C4FD1',
-          backgroundColor: 'rgba(108,79,209,0.12)',
-          fill: true, tension: 0.3, pointRadius: 3
-        }]
+        datasets: [{ data: d.evolucaoMensal.map(function (m) { return m.valor; }), borderColor: CORES.accent, backgroundColor: 'rgba(108,79,209,0.12)', fill: true, tension: 0.3, pointRadius: 3 }]
       },
       options: { plugins: { legend: { display: false } } }
     });
+  }
+
+  function renderContratos() {
+    var d = estado.dados;
+    document.getElementById('conteudo').innerHTML = '<div class="card"><h3>Contratos / orçamentos</h3>' +
+      tabela(['Categoria', 'Tipo', 'Valor', 'Status'], d.orcamentos.map(function (o) { return [o.categoria, o.tipo, formatarMoeda(o.valor), badge(o.status)]; })) +
+      '</div>';
+  }
+
+  function renderVagas() {
+    var d = estado.dados;
+    document.getElementById('conteudo').innerHTML = '<div class="card"><h3>Vagas</h3>' +
+      tabela(['Cargo', 'Status'], d.vagas.map(function (v) { return [v.cargo, badge(v.status)]; })) +
+      '</div>';
+  }
+
+  function renderEquipe() {
+    var d = estado.dados;
+    document.getElementById('conteudo').innerHTML = '<div class="card"><h3>Seus colaboradores</h3>' +
+      tabela(['Nome', 'Cargo', 'Salário atual', 'Situação'], d.colaboradores.map(function (c) {
+        return [c.nome, c.cargo, formatarMoeda(c.salarioAtual), c.demissao ? badge('Desligado') : badge('Ativo')];
+      })) + '</div>';
   }
 
   function tabela(cabecalhos, linhas) {
