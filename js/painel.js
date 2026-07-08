@@ -1,6 +1,7 @@
 (function () {
   var CHAVE_KEY = 'comarques_chave_interna';
-  var CORES = { accent: '#2C5F5A', warm: '#B5762C', danger: '#A73B32', linha: '#DCE0D7', accentSoft: '#7FA9A4', warmSoft: '#D9A768' };
+  var CORES = { accent: '#6C4FD1', warm: '#8B7FE8', danger: '#C74B86', linha: '#E7E3F5', accentSoft: '#B9A8ED', warmSoft: '#C9BFF0' };
+  var PALETA_DONUT = ['#6C4FD1', '#8B7FE8', '#C74B86', '#B9A8ED', '#4A3A85'];
 
   var ABAS = [
     { id: 'visao', label: 'Visão geral' },
@@ -206,7 +207,7 @@
       '</div>' +
       '<div class="grid-2" style="margin-top:24px;">' +
       '<div class="card"><h3>Evolução do faturamento</h3><canvas id="chart-visao-evolucao" height="160"></canvas></div>' +
-      donutCard('Vagas por status', 'chart-visao-vagas', statusVagas, ['#2C5F5A', '#B5762C', '#A73B32', '#7FA9A4']) +
+      donutCard('Vagas por status', 'chart-visao-vagas', statusVagas, PALETA_DONUT) +
       '</div>' +
       '<div class="grid-2" style="margin-top:24px;">' +
       '<div class="card"><h3>Top clientes por faturamento</h3>' + ranking(topClientes) + '</div>' +
@@ -220,7 +221,7 @@
   renderVisao.chart = function (f) {
     var serie = serieMensal(f.entrada, 'data', 'valor');
     criarChart(document.getElementById('chart-visao-evolucao'), { type: 'line', data: { labels: serie.map(function (m) { return m.rotulo; }), datasets: [{ data: serie.map(function (m) { return m.valor; }), borderColor: CORES.accent, backgroundColor: 'rgba(44,95,90,0.12)', fill: true, tension: 0.3 }] }, options: { plugins: { legend: { display: false } } } });
-    desenharDonut('chart-visao-vagas', agruparContagem(f.servicos, 'status'), ['#2C5F5A', '#B5762C', '#A73B32', '#7FA9A4']);
+    desenharDonut('chart-visao-vagas', agruparContagem(f.servicos, 'status'), PALETA_DONUT);
   };
 
   // ---- Financeiro ----
@@ -284,7 +285,7 @@
     return secTitle('Comercial', 'Orçamentos e taxa de conversão') +
       '<div class="kpi-row">' + kpi('Orçamentos no período', total) + kpi('Aprovados', aprovados.length, 'positivo') + kpi('Taxa de conversão', total ? Math.round(aprovados.length / total * 100) + '%' : '—') + kpi('Ticket médio aprovado', formatarMoeda(ticketMedio)) + '</div>' +
       '<div class="grid-2" style="margin-top:24px;">' +
-      donutCard('Orçamentos por status', 'chart-com-status', porStatus, ['#2C5F5A', '#A73B32', '#B5762C', '#7FA9A4']) +
+      donutCard('Orçamentos por status', 'chart-com-status', porStatus, PALETA_DONUT) +
       '<div class="card"><h3>Valor por categoria</h3>' + ranking(porCategoria) + '</div>' +
       '</div>' +
       '<div class="card" style="margin-top:24px;"><h3>Orçamentos do período</h3>' +
@@ -292,7 +293,7 @@
       '</div>';
   }
   renderComercial.html = renderComercial;
-  renderComercial.chart = function (f) { desenharDonut('chart-com-status', agruparContagem(f.orcamentos, 'status'), ['#2C5F5A', '#A73B32', '#B5762C', '#7FA9A4']); };
+  renderComercial.chart = function (f) { desenharDonut('chart-com-status', agruparContagem(f.orcamentos, 'status'), PALETA_DONUT); };
 
   // ---- Clientes ----
   function renderClientes(f) {
@@ -314,8 +315,8 @@
     var contratadosPorTipo = agruparContagem(f.servicos.filter(function (s) { return s.status === 'Contratado'; }), 'tipoVaga');
     return secTitle('Vagas', f.servicos.length + ' vaga(s) no período') +
       '<div class="grid-2">' +
-      donutCard('Vagas por status', 'chart-vagas-status', porStatus, ['#2C5F5A', '#B5762C', '#A73B32', '#7FA9A4']) +
-      donutCard('Contratações por tipo de vaga', 'chart-vagas-tipo', contratadosPorTipo, ['#2C5F5A', '#7FA9A4', '#B5762C']) +
+      donutCard('Vagas por status', 'chart-vagas-status', porStatus, PALETA_DONUT) +
+      donutCard('Contratações por tipo de vaga', 'chart-vagas-tipo', contratadosPorTipo, PALETA_DONUT) +
       '</div>' +
       '<div class="card" style="margin-top:24px;"><h3>Todas as vagas</h3>' +
       tabela(['Cargo', 'Cliente', 'Candidatados', 'Entrevistados', 'Status'], f.servicos.map(function (s) { return [s.cargo, s.clienteNome, formatarNumero(s.candidatados), formatarNumero(s.entrevistados), badge(s.status)]; })) +
@@ -323,8 +324,8 @@
   }
   renderVagas.html = renderVagas;
   renderVagas.chart = function (f) {
-    desenharDonut('chart-vagas-status', agruparContagem(f.servicos, 'status'), ['#2C5F5A', '#B5762C', '#A73B32', '#7FA9A4']);
-    desenharDonut('chart-vagas-tipo', agruparContagem(f.servicos.filter(function (s) { return s.status === 'Contratado'; }), 'tipoVaga'), ['#2C5F5A', '#7FA9A4', '#B5762C']);
+    desenharDonut('chart-vagas-status', agruparContagem(f.servicos, 'status'), PALETA_DONUT);
+    desenharDonut('chart-vagas-tipo', agruparContagem(f.servicos.filter(function (s) { return s.status === 'Contratado'; }), 'tipoVaga'), PALETA_DONUT);
   };
 
   // ---- Metas ----
@@ -346,7 +347,7 @@
     var metaMap = {}; f.metas.forEach(function (m) { var mk = m.ano + '-' + String(m.mesIndex + 1).padStart(2, '0'); metaMap[mk] = (metaMap[mk] || 0) + m.valor; });
     var meses = Array.from(new Set(Object.keys(realizadoMap).concat(Object.keys(metaMap)))).sort();
     criarChart(document.getElementById('chart-metas'), { data: { labels: meses.map(rotuloMes), datasets: [
-      { type: 'bar', label: 'Meta', data: meses.map(function (m) { return metaMap[m] || 0; }), backgroundColor: '#EADFCB' },
+      { type: 'bar', label: 'Meta', data: meses.map(function (m) { return metaMap[m] || 0; }), backgroundColor: '#EFEAFB' },
       { type: 'line', label: 'Realizado', data: meses.map(function (m) { return realizadoMap[m] || 0; }), borderColor: CORES.warm, tension: 0.3 }
     ] }, options: { plugins: { legend: { position: 'bottom' } } } });
   };

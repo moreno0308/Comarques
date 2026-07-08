@@ -118,8 +118,8 @@
         datasets: [{
           label: 'Valor pago',
           data: d.evolucaoMensal.map(function (m) { return m.valor; }),
-          borderColor: '#2C5F5A',
-          backgroundColor: 'rgba(44,95,90,0.12)',
+          borderColor: '#6C4FD1',
+          backgroundColor: 'rgba(108,79,209,0.12)',
           fill: true, tension: 0.3, pointRadius: 3
         }]
       },
