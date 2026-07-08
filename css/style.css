@@ -358,6 +358,12 @@ input:focus, button:focus-visible {
   margin-bottom: 12px;
 }
 
+.sidebar .brand .brand-mark {
+  height: 34px;
+  display: block;
+  margin-bottom: 10px;
+}
+
 .sidebar .brand .eyebrow {
   color: var(--muted);
   font-size: 10px;
