@@ -310,12 +310,21 @@
     var ativos = f.clientes.filter(function (c) { return !c.termino; }).length;
     return secTitle('Clientes', f.clientes.length + ' cliente(s) no filtro atual') +
       '<div class="kpi-row">' + kpi('Total de clientes', f.clientes.length) + kpi('Ativos', ativos, 'positivo') + kpi('Encerrados', f.clientes.length - ativos, f.clientes.length - ativos ? 'negativo' : '') + '</div>' +
-      '<div class="card" style="margin-top:24px;"><h3>Faturamento por cliente</h3>' + ranking(top) + '</div>' +
+      '<div class="card" style="margin-top:24px;"><h3>Faturamento por cliente</h3><canvas id="chart-clientes-faturamento" height="220"></canvas></div>' +
       '<div class="card" style="margin-top:24px;"><h3>Cadastro</h3>' +
       tabela(['Empresa', 'Segmento', 'Porte', 'Situação'], f.clientes.map(function (c) { return [c.nome, c.segmento, c.porte, c.termino ? badge('Encerrado') : badge('Ativo')]; })) +
       '</div>';
   }
   renderClientes.html = renderClientes;
+  renderClientes.chart = function (f) {
+    var receitaPorCliente = agruparSoma(f.entrada, 'clienteNome', 'valor');
+    var top = Object.entries(receitaPorCliente).map(function (e) { return { nome: e[0], valor: e[1] }; }).sort(function (a, b) { return b.valor - a.valor; });
+    criarChart(document.getElementById('chart-clientes-faturamento'), {
+      type: 'bar',
+      data: { labels: top.map(function (c) { return c.nome; }), datasets: [{ data: top.map(function (c) { return c.valor; }), backgroundColor: CORES.accent, borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { autoSkip: false, maxRotation: 40, minRotation: 40 } }, y: { grid: { color: CORES.linha } } } }
+    });
+  };
 
   // ---- Vagas ----
   function renderVagas(f) {
