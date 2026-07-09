@@ -108,7 +108,7 @@
     var d = estado.dados;
     return {
       entrada: d.entrada.filter(function (r) { return dentroPeriodo(monthKeyISO(r.data)) && mesmoCliente(r.idCliente); }),
-      saida: d.saida.filter(function (r) { return dentroPeriodo(monthKeyISO(r.data)) && mesmoCliente(r.idCliente); }),
+      saida: d.saida.filter(function (r) { return dentroPeriodo(monthKeyISO(r.data)) && (estado.clienteId === 'todos' || r.idCliente === null || String(r.idCliente) === String(estado.clienteId)); }),
       orcamentos: d.orcamentos.filter(function (o) { return dentroPeriodo(monthKeyISO(o.fechamento || o.inicio)) && mesmoCliente(o.idCliente); }),
       servicos: d.servicos.filter(function (s) { return dentroPeriodo(monthKeyISO(s.abertura || s.fechamento)) && mesmoCliente(s.idCliente); }),
       metas: d.metas.filter(function (m) { return dentroPeriodo(m.ano + '-' + String(m.mesIndex + 1).padStart(2, '0')); }),
