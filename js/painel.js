@@ -108,7 +108,7 @@
     var d = estado.dados;
     return {
       entrada: d.entrada.filter(function (r) { return dentroPeriodo(monthKeyISO(r.data)) && mesmoCliente(r.idCliente); }),
-      saida: d.saida.filter(function (r) { return dentroPeriodo(monthKeyISO(r.data)); }),
+      saida: d.saida.filter(function (r) { return dentroPeriodo(monthKeyISO(r.data)) && mesmoCliente(r.idCliente); }),
       orcamentos: d.orcamentos.filter(function (o) { return dentroPeriodo(monthKeyISO(o.fechamento || o.inicio)) && mesmoCliente(o.idCliente); }),
       servicos: d.servicos.filter(function (s) { return dentroPeriodo(monthKeyISO(s.abertura || s.fechamento)) && mesmoCliente(s.idCliente); }),
       metas: d.metas.filter(function (m) { return dentroPeriodo(m.ano + '-' + String(m.mesIndex + 1).padStart(2, '0')); }),
@@ -235,10 +235,13 @@
   // ---- Financeiro ----
   function renderFinanceiro(f) {
     var faturamento = somar(f.entrada, 'valor'), despesas = somar(f.saida, 'valor'), lucro = faturamento - despesas;
+    var despesasAtribuidas = somar(f.saida.filter(function (r) { return r.idCliente; }), 'valor');
+    var despesasGerais = despesas - despesasAtribuidas;
     var porCategoriaDespesa = Object.entries(agruparSoma(f.saida, 'categoria', 'valor')).map(function (e) { return { nome: e[0], valor: e[1] }; }).sort(function (a, b) { return b.valor - a.valor; });
     var porFormaPgto = Object.entries(agruparSoma(f.entrada, 'formaPgto', 'valor')).map(function (e) { return { nome: e[0], valor: e[1] }; }).sort(function (a, b) { return b.valor - a.valor; });
     return secTitle('Financeiro', 'Faturamento, despesas e margem no período') +
       '<div class="kpi-row">' + kpi('Faturamento', formatarMoeda(faturamento), 'positivo') + kpi('Despesas', formatarMoeda(despesas), 'negativo') + kpi('Lucro líquido', formatarMoeda(lucro), lucro >= 0 ? 'positivo' : 'negativo') + kpi('Margem líquida', faturamento ? Math.round(lucro / faturamento * 100) + '%' : '—') + '</div>' +
+      '<div class="kpi-row" style="margin-top:16px;">' + kpi('Despesas atribuídas a clientes', formatarMoeda(despesasAtribuidas)) + kpi('Despesas gerais (overhead)', formatarMoeda(despesasGerais)) + '</div>' +
       '<div class="card" style="margin-top:24px;"><h3>Evolução: faturamento x despesas x lucro</h3><canvas id="chart-fin-evolucao" height="150"></canvas></div>' +
       '<div class="grid-2" style="margin-top:24px;">' +
       '<div class="card"><h3>Despesas por categoria</h3>' + ranking(porCategoriaDespesa) + '</div>' +
@@ -343,11 +346,19 @@
     var receitaPorCliente = agruparSoma(f.entrada, 'clienteNome', 'valor');
     var top = Object.entries(receitaPorCliente).map(function (e) { return { nome: e[0], valor: e[1] }; }).sort(function (a, b) { return b.valor - a.valor; });
     var ativos = f.clientes.filter(function (c) { return !c.termino; }).length;
+
+    var receitaPorId = {}; f.entrada.forEach(function (r) { receitaPorId[r.idCliente] = (receitaPorId[r.idCliente] || 0) + r.valor; });
+    var custoPorId = {}; f.saida.forEach(function (r) { if (r.idCliente) custoPorId[r.idCliente] = (custoPorId[r.idCliente] || 0) + r.valor; });
+
     return secTitle('Clientes', f.clientes.length + ' cliente(s) no filtro atual') +
       '<div class="kpi-row">' + kpi('Total de clientes', f.clientes.length) + kpi('Ativos', ativos, 'positivo') + kpi('Encerrados', f.clientes.length - ativos, f.clientes.length - ativos ? 'negativo' : '') + '</div>' +
       '<div class="card" style="margin-top:24px;"><h3>Faturamento por cliente</h3><canvas id="chart-clientes-faturamento" height="220"></canvas></div>' +
-      '<div class="card" style="margin-top:24px;"><h3>Cadastro</h3>' +
-      tabela(['Empresa', 'Segmento', 'Porte', 'Situação'], f.clientes.map(function (c) { return [c.nome, c.segmento, c.porte, c.termino ? badge('Encerrado') : badge('Ativo')]; })) +
+      '<div class="card" style="margin-top:24px;"><h3>Cadastro e rentabilidade</h3>' +
+      '<p style="color:var(--muted);font-size:12px;margin-top:-8px;margin-bottom:14px;">Custo direto = despesas ligadas a vagas desse cliente (via Id Vaga). Não inclui despesas gerais da consultoria.</p>' +
+      tabela(['Empresa', 'Segmento', 'Faturamento', 'Custo direto', 'Margem', 'Situação'], f.clientes.map(function (c) {
+        var receita = receitaPorId[c.id] || 0, custo = custoPorId[c.id] || 0;
+        return [c.nome, c.segmento, formatarMoeda(receita), formatarMoeda(custo), formatarMoeda(receita - custo), c.termino ? badge('Encerrado') : badge('Ativo')];
+      })) +
       '</div>';
   }
   renderClientes.html = renderClientes;
