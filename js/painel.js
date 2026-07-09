@@ -15,7 +15,7 @@
     { id: 'lancar', label: 'Lançar dados' }
   ];
 
-  var estado = { dados: null, abaAtual: 'visao', deMonth: null, ateMonth: null, clienteId: 'todos' };
+  var estado = { dados: null, abaAtual: 'visao', deMonth: null, ateMonth: null, clienteId: 'todos', filtroStatusVaga: 'todos' };
   var chartsAtivos = [];
 
   function pegarChaveSalva() { return localStorage.getItem(CHAVE_KEY) || ''; }
@@ -198,7 +198,6 @@
     var contratados = f.servicos.filter(function (s) { return s.status === 'Contratado'; }).length;
 
     var statusVagas = agruparContagem(f.servicos, 'status');
-    var topClientes = Object.entries(agruparSoma(f.entrada, 'clienteNome', 'valor')).map(function (e) { return { nome: e[0], valor: e[1] }; }).sort(function (a, b) { return b.valor - a.valor; }).slice(0, 6);
 
     return secTitle('Resumo do período', f.entrada.length + ' lançamento(s) de faturamento') +
       '<div class="kpi-row">' +
@@ -212,7 +211,7 @@
       donutCard('Vagas por status', 'chart-visao-vagas', statusVagas, PALETA_DONUT) +
       '</div>' +
       '<div class="grid-2" style="margin-top:24px;">' +
-      '<div class="card"><h3>Top clientes por faturamento</h3>' + ranking(topClientes) + '</div>' +
+      '<div class="card"><h3>Top clientes por faturamento</h3><canvas id="chart-visao-clientes" height="200"></canvas></div>' +
       '<div class="card"><h3>Resumo do período</h3><ul class="resumo-lista">' +
       '<li>' + contratados + ' contratação(ões) fechada(s), ' + vagasAbertas + ' vaga(s) ainda em aberto</li>' +
       '<li>' + aprovados + ' de ' + totalOrc + ' orçamento(s) aprovados (' + (totalOrc ? Math.round(aprovados / totalOrc * 100) : 0) + '%)</li>' +
@@ -224,6 +223,13 @@
     var serie = serieMensal(f.entrada, 'data', 'valor');
     criarChart(document.getElementById('chart-visao-evolucao'), { type: 'line', data: { labels: serie.map(function (m) { return m.rotulo; }), datasets: [{ data: serie.map(function (m) { return m.valor; }), borderColor: CORES.accent, backgroundColor: 'rgba(44,95,90,0.12)', fill: true, tension: 0.3 }] }, options: { plugins: { legend: { display: false } } } });
     desenharDonut('chart-visao-vagas', agruparContagem(f.servicos, 'status'), PALETA_DONUT);
+
+    var topClientes = Object.entries(agruparSoma(f.entrada, 'clienteNome', 'valor')).map(function (e) { return { nome: e[0], valor: e[1] }; }).sort(function (a, b) { return b.valor - a.valor; }).slice(0, 8);
+    criarChart(document.getElementById('chart-visao-clientes'), {
+      type: 'bar',
+      data: { labels: topClientes.map(function (c) { return c.nome; }), datasets: [{ data: topClientes.map(function (c) { return c.valor; }), backgroundColor: CORES.accent, borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { autoSkip: false, maxRotation: 40, minRotation: 40 } }, y: { grid: { color: CORES.linha } } } }
+    });
   };
 
   // ---- Financeiro ----
@@ -313,21 +319,32 @@
 
   // ---- Vagas ----
   function renderVagas(f) {
-    var porStatus = agruparContagem(f.servicos, 'status');
-    var contratadosPorTipo = agruparContagem(f.servicos.filter(function (s) { return s.status === 'Contratado'; }), 'tipoVaga');
-    return secTitle('Vagas', f.servicos.length + ' vaga(s) no período') +
+    var statusDisponiveis = Array.from(new Set(f.servicos.map(function (s) { return s.status; }))).filter(Boolean);
+    var vagasFiltradas = estado.filtroStatusVaga === 'todos' ? f.servicos : f.servicos.filter(function (s) { return s.status === estado.filtroStatusVaga; });
+    var porStatus = agruparContagem(vagasFiltradas, 'status');
+    var contratadosPorTipo = agruparContagem(vagasFiltradas.filter(function (s) { return s.status === 'Contratado'; }), 'tipoVaga');
+    return secTitle('Vagas', vagasFiltradas.length + ' de ' + f.servicos.length + ' vaga(s) no período') +
+      '<div class="filtro-grupo" style="margin-bottom:16px;"><span>Status</span><select id="filtro-status-vaga">' +
+      '<option value="todos"' + (estado.filtroStatusVaga === 'todos' ? ' selected' : '') + '>Todos os status</option>' +
+      statusDisponiveis.map(function (s) { return '<option value="' + s + '"' + (estado.filtroStatusVaga === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') +
+      '</select></div>' +
       '<div class="grid-2">' +
       donutCard('Vagas por status', 'chart-vagas-status', porStatus, PALETA_DONUT) +
       donutCard('Contratações por tipo de vaga', 'chart-vagas-tipo', contratadosPorTipo, PALETA_DONUT) +
       '</div>' +
-      '<div class="card" style="margin-top:24px;"><h3>Todas as vagas</h3>' +
-      tabela(['Cargo', 'Cliente', 'Candidatados', 'Entrevistados', 'Status'], f.servicos.map(function (s) { return [s.cargo, s.clienteNome, formatarNumero(s.candidatados), formatarNumero(s.entrevistados), badge(s.status)]; })) +
+      '<div class="card" style="margin-top:24px;"><h3>Vagas' + (estado.filtroStatusVaga === 'todos' ? '' : ' — ' + estado.filtroStatusVaga) + '</h3>' +
+      tabela(['Cargo', 'Cliente', 'Candidatados', 'Entrevistados', 'Status'], vagasFiltradas.map(function (s) { return [s.cargo, s.clienteNome, formatarNumero(s.candidatados), formatarNumero(s.entrevistados), badge(s.status)]; })) +
       '</div>';
   }
   renderVagas.html = renderVagas;
   renderVagas.chart = function (f) {
-    desenharDonut('chart-vagas-status', agruparContagem(f.servicos, 'status'), PALETA_DONUT);
-    desenharDonut('chart-vagas-tipo', agruparContagem(f.servicos.filter(function (s) { return s.status === 'Contratado'; }), 'tipoVaga'), PALETA_DONUT);
+    var vagasFiltradas = estado.filtroStatusVaga === 'todos' ? f.servicos : f.servicos.filter(function (s) { return s.status === estado.filtroStatusVaga; });
+    desenharDonut('chart-vagas-status', agruparContagem(vagasFiltradas, 'status'), PALETA_DONUT);
+    desenharDonut('chart-vagas-tipo', agruparContagem(vagasFiltradas.filter(function (s) { return s.status === 'Contratado'; }), 'tipoVaga'), PALETA_DONUT);
+    document.getElementById('filtro-status-vaga').addEventListener('change', function (e) {
+      estado.filtroStatusVaga = e.target.value;
+      renderAba();
+    });
   };
 
   // ---- Metas ----
