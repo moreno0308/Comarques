@@ -15,7 +15,7 @@
     { id: 'lancar', label: 'Lançar dados' }
   ];
 
-  var estado = { dados: null, abaAtual: 'visao', deMonth: null, ateMonth: null, clienteId: 'todos', filtroStatusVaga: 'todos' };
+  var estado = { dados: null, abaAtual: 'visao', deMonth: null, ateMonth: null, clienteId: 'todos', filtroStatusVaga: 'todos', filtroTipoVagaOp: 'todos', filtroStatusOp: 'todos', filtroCategoriaCom: 'todos', filtroStatusCom: 'todos' };
   var chartsAtivos = [];
 
   function pegarChaveSalva() { return localStorage.getItem(CHAVE_KEY) || ''; }
@@ -265,43 +265,78 @@
 
   // ---- Operacional ----
   function renderOperacional(f) {
-    var candidatados = somar(f.servicos, 'candidatados'), entrevistados = somar(f.servicos, 'entrevistados');
-    var contratados = f.servicos.filter(function (s) { return s.status === 'Contratado'; });
-    var vagasAbertas = f.servicos.filter(function (s) { return s.status !== 'Contratado' && s.status !== 'Suspensa'; }).length;
+    var tiposDisponiveis = Array.from(new Set(f.servicos.map(function (s) { return s.tipoVaga; }))).filter(Boolean);
+    var statusDisponiveis = Array.from(new Set(f.servicos.map(function (s) { return s.status; }))).filter(Boolean);
+    var servicosFiltrados = f.servicos
+      .filter(function (s) { return estado.filtroTipoVagaOp === 'todos' || s.tipoVaga === estado.filtroTipoVagaOp; })
+      .filter(function (s) { return estado.filtroStatusOp === 'todos' || s.status === estado.filtroStatusOp; });
+
+    var candidatados = somar(servicosFiltrados, 'candidatados'), entrevistados = somar(servicosFiltrados, 'entrevistados');
+    var contratados = servicosFiltrados.filter(function (s) { return s.status === 'Contratado'; });
+    var vagasAbertas = servicosFiltrados.filter(function (s) { return s.status !== 'Contratado' && s.status !== 'Suspensa'; }).length;
     var temposDias = contratados.filter(function (s) { return s.abertura && s.fechamento; }).map(function (s) { return Math.round((new Date(s.fechamento) - new Date(s.abertura)) / 86400000); });
     var tempoMedio = temposDias.length ? Math.round(temposDias.reduce(function (a, b) { return a + b; }, 0) / temposDias.length) : null;
-    return secTitle('Operacional', 'Funil de recrutamento do período') +
+    return secTitle('Operacional', servicosFiltrados.length + ' de ' + f.servicos.length + ' vaga(s) no período') +
+      '<div class="filtro-grupo" style="margin-bottom:16px;gap:16px;">' +
+      '<span>Tipo de vaga</span><select id="filtro-tipo-vaga-op"><option value="todos"' + (estado.filtroTipoVagaOp === 'todos' ? ' selected' : '') + '>Todos</option>' +
+      tiposDisponiveis.map(function (t) { return '<option value="' + t + '"' + (estado.filtroTipoVagaOp === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select>' +
+      '<span>Status</span><select id="filtro-status-op"><option value="todos"' + (estado.filtroStatusOp === 'todos' ? ' selected' : '') + '>Todos</option>' +
+      statusDisponiveis.map(function (s) { return '<option value="' + s + '"' + (estado.filtroStatusOp === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
+      '</div>' +
       '<div class="funil">' +
       '<div class="funil-etapa"><div class="label">Candidatados</div><div class="value">' + formatarNumero(candidatados) + '</div></div>' +
       '<div class="funil-etapa"><div class="label">Entrevistados</div><div class="value">' + formatarNumero(entrevistados) + '</div><div class="taxa">' + (candidatados ? Math.round(entrevistados / candidatados * 100) : 0) + '% dos candidatados</div></div>' +
       '<div class="funil-etapa"><div class="label">Contratados</div><div class="value">' + formatarNumero(contratados.length) + '</div><div class="taxa">' + (entrevistados ? Math.round(contratados.length / entrevistados * 100) : 0) + '% dos entrevistados</div></div>' +
       '</div>' +
-      '<div class="kpi-row" style="margin-top:24px;">' + kpi('Vagas em aberto', vagasAbertas) + kpi('Tempo médio de contratação', tempoMedio !== null ? tempoMedio + ' dia(s)' : '—') + kpi('Vagas no período', f.servicos.length) + '</div>' +
+      '<div class="kpi-row" style="margin-top:24px;">' + kpi('Vagas em aberto', vagasAbertas) + kpi('Tempo médio de contratação', tempoMedio !== null ? tempoMedio + ' dia(s)' : '—') + kpi('Vagas no filtro', servicosFiltrados.length) + '</div>' +
       '<div class="card" style="margin-top:24px;"><h3>Vagas do período</h3>' +
-      tabela(['Cargo', 'Cliente', 'Tipo de vaga', 'Status'], f.servicos.map(function (s) { return [s.cargo, s.clienteNome, s.tipoVaga, badge(s.status)]; })) +
+      tabela(['Cargo', 'Cliente', 'Tipo de vaga', 'Status'], servicosFiltrados.map(function (s) { return [s.cargo, s.clienteNome, s.tipoVaga, badge(s.status)]; })) +
       '</div>';
   }
   renderOperacional.html = renderOperacional;
+  renderOperacional.chart = function () {
+    document.getElementById('filtro-tipo-vaga-op').addEventListener('change', function (e) { estado.filtroTipoVagaOp = e.target.value; renderAba(); });
+    document.getElementById('filtro-status-op').addEventListener('change', function (e) { estado.filtroStatusOp = e.target.value; renderAba(); });
+  };
 
   // ---- Comercial ----
   function renderComercial(f) {
-    var total = f.orcamentos.length;
-    var aprovados = f.orcamentos.filter(function (o) { return String(o.status).indexOf('Aprovado') !== -1; });
+    var categoriasDisponiveis = Array.from(new Set(f.orcamentos.map(function (o) { return o.categoria; }))).filter(Boolean);
+    var statusDisponiveis = Array.from(new Set(f.orcamentos.map(function (o) { return o.status; }))).filter(Boolean);
+    var orcamentosFiltrados = f.orcamentos
+      .filter(function (o) { return estado.filtroCategoriaCom === 'todos' || o.categoria === estado.filtroCategoriaCom; })
+      .filter(function (o) { return estado.filtroStatusCom === 'todos' || o.status === estado.filtroStatusCom; });
+
+    var total = orcamentosFiltrados.length;
+    var aprovados = orcamentosFiltrados.filter(function (o) { return String(o.status).indexOf('Aprovado') !== -1; });
     var ticketMedio = aprovados.length ? somar(aprovados, 'valor') / aprovados.length : 0;
-    var porStatus = agruparContagem(f.orcamentos, 'status');
-    var porCategoria = Object.entries(agruparSoma(f.orcamentos, 'categoria', 'valor')).map(function (e) { return { nome: e[0], valor: e[1] }; }).sort(function (a, b) { return b.valor - a.valor; });
-    return secTitle('Comercial', 'Orçamentos e taxa de conversão') +
-      '<div class="kpi-row">' + kpi('Orçamentos no período', total) + kpi('Aprovados', aprovados.length, 'positivo') + kpi('Taxa de conversão', total ? Math.round(aprovados.length / total * 100) + '%' : '—') + kpi('Ticket médio aprovado', formatarMoeda(ticketMedio)) + '</div>' +
+    var porStatus = agruparContagem(orcamentosFiltrados, 'status');
+    var porCategoria = Object.entries(agruparSoma(orcamentosFiltrados, 'categoria', 'valor')).map(function (e) { return { nome: e[0], valor: e[1] }; }).sort(function (a, b) { return b.valor - a.valor; });
+    return secTitle('Comercial', total + ' de ' + f.orcamentos.length + ' orçamento(s) no período') +
+      '<div class="filtro-grupo" style="margin-bottom:16px;gap:16px;">' +
+      '<span>Categoria</span><select id="filtro-categoria-com"><option value="todos"' + (estado.filtroCategoriaCom === 'todos' ? ' selected' : '') + '>Todas</option>' +
+      categoriasDisponiveis.map(function (c) { return '<option value="' + c + '"' + (estado.filtroCategoriaCom === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>' +
+      '<span>Status</span><select id="filtro-status-com"><option value="todos"' + (estado.filtroStatusCom === 'todos' ? ' selected' : '') + '>Todos</option>' +
+      statusDisponiveis.map(function (s) { return '<option value="' + s + '"' + (estado.filtroStatusCom === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
+      '</div>' +
+      '<div class="kpi-row">' + kpi('Orçamentos no filtro', total) + kpi('Aprovados', aprovados.length, 'positivo') + kpi('Taxa de conversão', total ? Math.round(aprovados.length / total * 100) + '%' : '—') + kpi('Ticket médio aprovado', formatarMoeda(ticketMedio)) + '</div>' +
       '<div class="grid-2" style="margin-top:24px;">' +
       donutCard('Orçamentos por status', 'chart-com-status', porStatus, PALETA_DONUT) +
       '<div class="card"><h3>Valor por categoria</h3>' + ranking(porCategoria) + '</div>' +
       '</div>' +
       '<div class="card" style="margin-top:24px;"><h3>Orçamentos do período</h3>' +
-      tabela(['Cliente', 'Categoria', 'Valor', 'Status'], f.orcamentos.map(function (o) { return [o.clienteNome, o.categoria, formatarMoeda(o.valor), badge(o.status)]; })) +
+      tabela(['Cliente', 'Categoria', 'Valor', 'Status'], orcamentosFiltrados.map(function (o) { return [o.clienteNome, o.categoria, formatarMoeda(o.valor), badge(o.status)]; })) +
       '</div>';
   }
   renderComercial.html = renderComercial;
-  renderComercial.chart = function (f) { desenharDonut('chart-com-status', agruparContagem(f.orcamentos, 'status'), PALETA_DONUT); };
+  renderComercial.chart = function (f) {
+    var orcamentosFiltrados = f.orcamentos
+      .filter(function (o) { return estado.filtroCategoriaCom === 'todos' || o.categoria === estado.filtroCategoriaCom; })
+      .filter(function (o) { return estado.filtroStatusCom === 'todos' || o.status === estado.filtroStatusCom; });
+    desenharDonut('chart-com-status', agruparContagem(orcamentosFiltrados, 'status'), PALETA_DONUT);
+    document.getElementById('filtro-categoria-com').addEventListener('change', function (e) { estado.filtroCategoriaCom = e.target.value; renderAba(); });
+    document.getElementById('filtro-status-com').addEventListener('change', function (e) { estado.filtroStatusCom = e.target.value; renderAba(); });
+  };
 
   // ---- Clientes ----
   function renderClientes(f) {
@@ -358,12 +393,26 @@
 
   // ---- Metas ----
   function renderMetas(f) {
+    var agora = new Date();
+    var mesAtual = agora.getFullYear() + '-' + String(agora.getMonth() + 1).padStart(2, '0');
     var realizadoMap = {}; f.entrada.forEach(function (r) { var mk = monthKeyISO(r.data); if (mk) realizadoMap[mk] = (realizadoMap[mk] || 0) + r.valor; });
     var metaMap = {}; f.metas.forEach(function (m) { var mk = m.ano + '-' + String(m.mesIndex + 1).padStart(2, '0'); metaMap[mk] = (metaMap[mk] || 0) + m.valor; });
     var meses = Array.from(new Set(Object.keys(realizadoMap).concat(Object.keys(metaMap)))).sort();
     var linhas = meses.map(function (mk) {
       var meta = metaMap[mk] || 0, real = realizadoMap[mk] || 0, pct = meta ? Math.round(real / meta * 100) : null;
-      return [rotuloMes(mk), formatarMoeda(meta), formatarMoeda(real), pct === null ? '—' : (pct >= 100 ? badge('Cumprida (' + pct + '%)') : pct >= 70 ? badge('Em andamento (' + pct + '%)') : badge('Abaixo (' + pct + '%)'))];
+      var statusHtml;
+      if (pct === null) {
+        statusHtml = '—';
+      } else if (mk > mesAtual) {
+        statusHtml = '<span class="badge neutro">Ainda não chegou</span>';
+      } else if (pct >= 100) {
+        statusHtml = badge('Cumprida (' + pct + '%)');
+      } else if (mk === mesAtual) {
+        statusHtml = '<span class="badge pendente">Em andamento (' + pct + '%)</span>';
+      } else {
+        statusHtml = '<span class="badge alerta">Não atingida (' + pct + '%)</span>';
+      }
+      return [rotuloMes(mk), formatarMoeda(meta), formatarMoeda(real), statusHtml];
     });
     return secTitle('Metas', 'Meta da consultoria (global) x realizado no filtro atual') +
       '<div class="card"><h3>Meta x realizado</h3><canvas id="chart-metas" height="150"></canvas></div>' +
@@ -375,8 +424,8 @@
     var metaMap = {}; f.metas.forEach(function (m) { var mk = m.ano + '-' + String(m.mesIndex + 1).padStart(2, '0'); metaMap[mk] = (metaMap[mk] || 0) + m.valor; });
     var meses = Array.from(new Set(Object.keys(realizadoMap).concat(Object.keys(metaMap)))).sort();
     criarChart(document.getElementById('chart-metas'), { data: { labels: meses.map(rotuloMes), datasets: [
-      { type: 'bar', label: 'Meta', data: meses.map(function (m) { return metaMap[m] || 0; }), backgroundColor: '#EFEAFB' },
-      { type: 'line', label: 'Realizado', data: meses.map(function (m) { return realizadoMap[m] || 0; }), borderColor: CORES.warm, tension: 0.3 }
+      { type: 'bar', label: 'Meta', data: meses.map(function (m) { return metaMap[m] || 0; }), backgroundColor: '#EFEAFB', order: 2 },
+      { type: 'line', label: 'Realizado', data: meses.map(function (m) { return realizadoMap[m] || 0; }), borderColor: CORES.warm, tension: 0.3, order: 1, z: 10 }
     ] }, options: { plugins: { legend: { position: 'bottom' } } } });
   };
 
