@@ -286,6 +286,7 @@ tr:last-child td { border-bottom: none; }
 .badge.ok { background: var(--accent-soft); color: var(--accent); }
 .badge.pendente { background: var(--warm-soft); color: var(--warm); }
 .badge.alerta { background: var(--danger-soft); color: var(--danger); }
+.badge.neutro { background: #EFEFEF; color: #8A8A8A; }
 
 /* ---------- Estado vazio / erro ---------- */
 
